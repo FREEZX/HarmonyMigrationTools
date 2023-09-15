@@ -2,9 +2,16 @@
   "profiles": {
     "Game": {
       "commandName": "Executable",
-      "workingDirectory": "G:\\Flax\\Games\\HarmonyMigrationTools",
-      "executablePath": "G:\\Flax\\Engine\\Flax_1.6\\Binaries\\Editor\\Win64\\Development\\FlaxEditor.exe",
-      "commandLineArgs": "-project \"G:\\Flax\\Games\\HarmonyMigrationTools\"",
+      "workingDirectory": "C:\\Development\\Flax Projects\\HarmonyMigrationTools",
+      "executablePath": "C:\\Program Files (x86)\\Flax\\Flax_1.6\\Binaries\\Editor\\Win64\\Development\\FlaxEditor.exe",
+      "commandLineArgs": "-project \"C:\\Development\\Flax Projects\\HarmonyMigrationTools\"",
+      "nativeDebugging": false
+    },
+    "ContentMigratorEditor": {
+      "commandName": "Executable",
+      "workingDirectory": "C:\\Development\\Flax Projects\\HarmonyMigrationTools",
+      "executablePath": "C:\\Program Files (x86)\\Flax\\Flax_1.6\\Binaries\\Editor\\Win64\\Development\\FlaxEditor.exe",
+      "commandLineArgs": "-project \"C:\\Development\\Flax Projects\\HarmonyMigrationTools\"",
       "nativeDebugging": false
     }
   }
