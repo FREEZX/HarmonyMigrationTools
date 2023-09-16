@@ -25,6 +25,7 @@ namespace ContentMigratorEditor
 
         private Dictionary<string, string> guidMap;
         private TextureMigrator textureMigrator = new TextureMigrator();
+        private AudioMigrator audioMigrator = new AudioMigrator();
 
         public override void Initialize(LayoutElementsContainer layout)
         {
@@ -125,6 +126,7 @@ namespace ContentMigratorEditor
             InitializeMigration(assetsPath, targetPath);
 
             textureMigrator.Migrate(assetsPath, targetPath);
+            audioMigrator.Migrate(assetsPath, targetPath);
 
             return;
             // var prefabFiles = Directory.EnumerateFiles(assetsPath, "*.prefab", SearchOption.AllDirectories);
@@ -171,36 +173,5 @@ namespace ContentMigratorEditor
             //     // }
             // }
         }
-        protected void LogYamlNode(YamlNode node)
-        {
-            switch (node.NodeType)
-            {
-                case YamlNodeType.Mapping:
-                    var children = (node as YamlMappingNode).Children;
-                    Debug.Log("{");
-                    Debug.Log(node.Tag);
-                    Debug.Log(node.Anchor);
-                    foreach (var e in children)
-                    {
-                        Debug.Log(e.Key + ":");
-                        LogYamlNode(e.Value);
-                    }
-                    Debug.Log("}");
-                    break;
-                case YamlNodeType.Sequence:
-                    var seqChildren = (node as YamlSequenceNode).Children;
-                    Debug.Log("[");
-                    foreach (var e in seqChildren)
-                    {
-                        LogYamlNode(e);
-                    }
-                    Debug.Log("]");
-                    break;
-                default:
-                    Debug.Log(node);
-                    break;
-            }
-        }
     }
-
 }

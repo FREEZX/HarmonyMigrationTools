@@ -66,6 +66,7 @@ class TextureMigrator : AssetMigratorBase
       var alphaUsage = int.Parse((textureImporterSettings["alphaUsage"] as YamlScalarNode).Value);
       var sRGBTexture = int.Parse((textureImporterSettings["mipmaps"]["sRGBTexture"] as YamlScalarNode).Value);
       var enableMipMap = int.Parse((textureImporterSettings["mipmaps"]["enableMipMap"] as YamlScalarNode).Value);
+      // The standard texture types in Unity are 0 - Normal and 1 - NormalMap
       if (textureType > 1)
       {
         textureType = 0;
@@ -117,14 +118,9 @@ class TextureMigrator : AssetMigratorBase
       Directory.CreateDirectory(targetDirectory);
       var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
       Debug.Log(contentFolder);
-
-      Debug.Log("eheyeye");
       Editor.Instance.ContentImporting.Import(texFile, contentFolder, false, importSettings);
       var importEntry = TextureImportEntry.CreateEntry(ref importRequest);
       bool success = importEntry.Import();
-
-      // var mis = new ModelImportSettings();
-      // mis.Settings.OptimizeKeyframe
     }
     if (metaErrors)
     {
