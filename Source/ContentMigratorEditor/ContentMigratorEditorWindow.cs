@@ -1,11 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
 using FlaxEditor;
+using FlaxEditor.Content.Import;
 using FlaxEditor.CustomEditors;
 using FlaxEditor.CustomEditors.Elements;
 using FlaxEngine;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using YamlDotNet.RepresentationModel;
 
 namespace ContentMigratorEditor
@@ -16,8 +20,11 @@ namespace ContentMigratorEditor
         private TextBoxElement projectPathTextbox;
         private TextBoxElement targetDirTextbox;
 
-        private string metaMapperContainer = "projectMetaMap.txt";
+        private string metaMapCacheJson = "projectMetaMap.json";
         private string targetMetaDir = "unityMeta";
+
+        private Dictionary<string, string> guidMap;
+        private TextureMigrator textureMigrator = new TextureMigrator();
 
         public override void Initialize(LayoutElementsContainer layout)
         {
@@ -59,6 +66,26 @@ namespace ContentMigratorEditor
             Directory.CreateDirectory(destinationPath);
             var metaFiles = Directory.EnumerateFiles(projectPath, "*.meta", SearchOption.AllDirectories);
             var destinationMetaPath = Path.Join(destinationPath, targetMetaDir);
+
+            guidMap = new Dictionary<string, string>();
+
+            var guidFilePath = Path.Join(destinationMetaPath, metaMapCacheJson);
+            if (File.Exists(guidFilePath))
+            {
+                using (StreamReader file = File.OpenText(guidFilePath))
+                using (JsonTextReader reader = new JsonTextReader(file))
+                {
+                    JObject o2 = (JObject)JToken.ReadFrom(reader);
+                    if (o2 != null)
+                    {
+                        foreach (var property in o2.Properties())
+                        {
+                            guidMap[property.Name] = property.Value<string>();
+                        }
+                    }
+                }
+            }
+
             Directory.CreateDirectory(destinationMetaPath);
             foreach (var metaFile in metaFiles)
             {
@@ -66,83 +93,15 @@ namespace ContentMigratorEditor
                 var deserializer = new YamlStream();
                 deserializer.Load(metaContents);
                 string guid = (deserializer.Documents[0].RootNode["guid"] as YamlScalarNode).Value;
-                File.Copy(metaFile, Path.Join(destinationMetaPath, guid));
-            }
-        }
-
-        private void MigrateTextures(string assetsPath)
-        {
-            var assetsDir = new DirectoryInfo(assetsPath);
-            var masks = new string[] {
-                "*.tga",
-                "*.png",
-                "*.bmp",
-                "*.gif",
-                "*.tiff",
-                "*.tif",
-                "*.jpeg",
-                "*.jpg",
-                "*.dds",
-                "*.hdr",
-                "*.raw"
-            };
-            var texFiles = Directory.
-                EnumerateFiles(assetsPath, "*", SearchOption.AllDirectories).
-                Where(fileName => masks.Any(pattern => FileSystemName.MatchesSimpleExpression(pattern, fileName)));
-
-            bool metaErrors = false;
-            foreach (var texFile in texFiles)
-            {
-                var meta = $"{texFile}.meta";
-                bool exists = File.Exists(meta);
-                if (!exists)
+                string destFile = Path.Join(destinationMetaPath, guid);
+                try
                 {
-                    metaErrors = true;
-                    Debug.LogError($"Meta file missing for file {texFile}");
-                    continue;
+                    File.Delete(destFile);
                 }
-
-                var metaContents = File.OpenText(meta);
-                var deserializer = new YamlStream();
-                deserializer.Load(metaContents);
-                Debug.Log(deserializer.Documents[0].RootNode["guid"]);
-                // var mis = new ModelImportSettings();
-                // mis.Settings.OptimizeKeyframe
-            }
-            if (metaErrors)
-            {
-                Debug.LogError("Meta errors. Migration stopping.");
+                catch (Exception e) { }
+                File.Copy(metaFile, destFile);
             }
         }
-        //
-        // private void MigrateModels(string assetsPath)
-        // {
-        //     var modelFiles = Directory.EnumerateFiles(assetsPath, "*.fbx", SearchOption.AllDirectories);
-        //
-        //     bool metaErrors = false;
-        //     foreach (var prefabFile in modelFiles)
-        //     {
-        //         var meta = $"{prefabFile}.meta";
-        //         bool exists = File.Exists(meta);
-        //         if (!exists)
-        //         {
-        //             metaErrors = true;
-        //             Debug.LogError($"Meta file missing for file {prefabFile}");
-        //             continue;
-        //         }
-        //
-        //         var metaContents = File.OpenText(meta);
-        //         var deserializer = new YamlStream();
-        //         deserializer.Load(metaContents);
-        //         Debug.Log(deserializer.Documents[0].RootNode["guid"]);
-        //         // var mis = new ModelImportSettings();
-        //         // mis.Settings.OptimizeKeyframe
-        //     }
-        //     if (metaErrors)
-        //     {
-        //         Debug.LogError("Meta errors. Migration stopping.");
-        //     }
-        // }
 
         private void MigrateClicked()
         {
@@ -165,52 +124,52 @@ namespace ContentMigratorEditor
 
             InitializeMigration(assetsPath, targetPath);
 
-            MigrateTextures(assetsPath);
+            textureMigrator.Migrate(assetsPath, targetPath);
 
             return;
-            var prefabFiles = Directory.EnumerateFiles(assetsPath, "*.prefab", SearchOption.AllDirectories);
-
-            bool metaErrors = false;
-            foreach (var prefabFile in prefabFiles)
-            {
-                var meta = $"{prefabFile}.meta";
-                bool exists = File.Exists(meta);
-                if (!exists)
-                {
-                    metaErrors = true;
-                    Debug.LogError($"Meta file missing for file {prefabFile}");
-                    continue;
-                }
-
-                var metaContents = File.OpenText(meta);
-                var deserializer = new YamlStream();
-                deserializer.Load(metaContents);
-                Debug.Log(deserializer.Documents[0].RootNode);
-            }
-            if (metaErrors)
-            {
-                Debug.LogError("Stopping migration due to asset file issues");
-                return;
-            }
-            foreach (var prefabFile in prefabFiles)
-            {
-                Debug.Log(prefabFile);
-                var prefabContents = File.OpenText(prefabFile);
-                var deserializer = new YamlStream();
-                deserializer.Load(prefabContents);
-                foreach (var doc in deserializer.Documents)
-                {
-                    var deserialized = doc.RootNode;
-                    LogYamlNode(deserialized);
-                }
-                // Debug.Log((deserialized as YamlMappingNode).Children);
-                // Debug.Log(deserialized[0]);
-                // deserialized.
-                // foreach (var node in deserialized.Start)
-                // {
-                //     Debug.Log(node);
-                // }
-            }
+            // var prefabFiles = Directory.EnumerateFiles(assetsPath, "*.prefab", SearchOption.AllDirectories);
+            //
+            // bool metaErrors = false;
+            // foreach (var prefabFile in prefabFiles)
+            // {
+            //     var meta = $"{prefabFile}.meta";
+            //     bool exists = File.Exists(meta);
+            //     if (!exists)
+            //     {
+            //         metaErrors = true;
+            //         Debug.LogError($"Meta file missing for file {prefabFile}");
+            //         continue;
+            //     }
+            //
+            //     var metaContents = File.OpenText(meta);
+            //     var deserializer = new YamlStream();
+            //     deserializer.Load(metaContents);
+            //     Debug.Log(deserializer.Documents[0].RootNode);
+            // }
+            // if (metaErrors)
+            // {
+            //     Debug.LogError("Stopping migration due to asset file issues");
+            //     return;
+            // }
+            // foreach (var prefabFile in prefabFiles)
+            // {
+            //     Debug.Log(prefabFile);
+            //     var prefabContents = File.OpenText(prefabFile);
+            //     var deserializer = new YamlStream();
+            //     deserializer.Load(prefabContents);
+            //     foreach (var doc in deserializer.Documents)
+            //     {
+            //         var deserialized = doc.RootNode;
+            //         LogYamlNode(deserialized);
+            //     }
+            //     // Debug.Log((deserialized as YamlMappingNode).Children);
+            //     // Debug.Log(deserialized[0]);
+            //     // deserialized.
+            //     // foreach (var node in deserialized.Start)
+            //     // {
+            //     //     Debug.Log(node);
+            //     // }
+            // }
         }
         protected void LogYamlNode(YamlNode node)
         {

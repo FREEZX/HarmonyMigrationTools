@@ -18,6 +18,10 @@ public class ContentMigratorEditor : GameEditorModule
         var libPath = Path.Combine(FolderPath, "..", "..", "Content", "YamlDotNet.dll");
         options.ScriptingAPI.FileReferences.Add(libPath);
         options.ExternalModules.Add(new BuildOptions.ExternalModule(BuildOptions.ExternalModule.Types.CSharp, libPath));
+
+        var jsonNetPath = Path.Combine(FolderPath, "..", "..", "Content", "Newtonsoft.Json.dll");
+        options.ScriptingAPI.FileReferences.Add(jsonNetPath);
+        options.ExternalModules.Add(new BuildOptions.ExternalModule(BuildOptions.ExternalModule.Types.CSharp, jsonNetPath));
         // Reference game scripts module
         // options.PublicDependencies.Add("GraphicsFeaturesTour");
     }
