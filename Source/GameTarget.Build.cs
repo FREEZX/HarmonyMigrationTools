@@ -9,5 +9,6 @@ public class GameTarget : GameProjectTarget
 
         // Reference the modules for game
         Modules.Add("Game");
+        Modules.Add("ContentMigratorEditor");
     }
 }

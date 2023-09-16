@@ -15,8 +15,9 @@ public class ContentMigratorEditor : GameEditorModule
         // To learn more see scripting documentation.
         BuildNativeCode = false;
 
-        Log.Message(Path.Combine(FolderPath, "..", "..", "Content", "YamlDotNet.dll"));
-        options.ScriptingAPI.FileReferences.Add(Path.Combine(FolderPath, "..", "..", "Content", "YamlDotNet.dll"));
+        var libPath = Path.Combine(FolderPath, "..", "..", "Content", "YamlDotNet.dll");
+        options.ScriptingAPI.FileReferences.Add(libPath);
+        options.ExternalModules.Add(new BuildOptions.ExternalModule(BuildOptions.ExternalModule.Types.CSharp, libPath));
         // Reference game scripts module
         // options.PublicDependencies.Add("GraphicsFeaturesTour");
     }
