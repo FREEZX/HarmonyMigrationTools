@@ -38,11 +38,12 @@ class TextureMigrator : AssetMigratorBase
 
   public override void Migrate(string assetsPath, string destinationPath)
   {
-
     var assetsDir = new DirectoryInfo(assetsPath);
     var texFiles = Directory.
         EnumerateFiles(assetsPath, "*", SearchOption.AllDirectories).
         Where(fileName => handledExtensions.Any(pattern => FileSystemName.MatchesSimpleExpression(pattern, fileName)));
+    // Find destination path directory
+    var destinationFolder = Editor.Instance.ContentDatabase.Find(destinationPath);
 
     bool metaErrors = false;
     foreach (var texFile in texFiles)
@@ -116,8 +117,8 @@ class TextureMigrator : AssetMigratorBase
       importRequest.Settings = importSettings;
       var targetDirectory = Path.GetDirectoryName(newProjectRelativePath);
       Directory.CreateDirectory(targetDirectory);
+      Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
       var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
-      Debug.Log(contentFolder);
       Editor.Instance.ContentImporting.Import(texFile, contentFolder, false, importSettings);
       var importEntry = TextureImportEntry.CreateEntry(ref importRequest);
       bool success = importEntry.Import();

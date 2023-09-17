@@ -1,20 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Enumeration;
 using System.Linq;
 using FlaxEditor;
-using FlaxEditor.Content.Import;
 using FlaxEditor.CustomEditors;
 using FlaxEditor.CustomEditors.Elements;
+using FlaxEditor.GUI;
+using FlaxEditor.Scripting;
 using FlaxEngine;
+using FlaxEngine.GUI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using YamlDotNet.RepresentationModel;
 
 namespace ContentMigratorEditor
 {
-
     public class ContentMigratorEditorWindow : CustomEditorWindow
     {
         private TextBoxElement projectPathTextbox;
@@ -26,21 +26,56 @@ namespace ContentMigratorEditor
         private Dictionary<string, string> guidMap;
         private TextureMigrator textureMigrator = new TextureMigrator();
         private AudioMigrator audioMigrator = new AudioMigrator();
+        private MaterialMigrator matMigrator = new MaterialMigrator();
+
+        private List<BuiltinMaterial> builtinMapList = new List<BuiltinMaterial>();
+        private List<GuidMaterial> materialMapList = new List<GuidMaterial>();
+        private ShaderMapperEditor openedShaderMapper;
 
         public override void Initialize(LayoutElementsContainer layout)
         {
-            layout.Label("Unity project path");
+            builtinMapList = MaterialMigrator.DefaultBuiltinMaterials.ToList();
             projectPathTextbox = layout.TextBox();
             var browseBtn = layout.Button("Browse");
             browseBtn.Button.Clicked += BrowseClicked;
             layout.Space(20);
+
             targetDirTextbox = layout.TextBox();
             targetDirTextbox.Text = Path.Join(Path.GetFullPath(Editor.Instance.GameProject.ProjectFolderPath), "Content", "Migrated");
             var browseTargetBtn = layout.Button("Browse");
             browseTargetBtn.Button.Clicked += BrowseTargetClicked;
             layout.Space(20);
+
+            var openShaderMapperBtn = layout.Button("Shader Mapper");
+            openShaderMapperBtn.Button.Clicked += OpenShaderMapperClicked;
+
             var button = layout.Button("Migrate content", Color.Blue);
             button.Button.Clicked += MigrateClicked;
+        }
+
+        protected override void Deinitialize()
+        {
+            if (openedShaderMapper != null)
+            {
+                openedShaderMapper.Window.Close();
+            }
+        }
+
+        private void OpenShaderMapperClicked()
+        {
+            if (openedShaderMapper != null && !openedShaderMapper.Window.IsHidden)
+            {
+                openedShaderMapper.Window.FocusOrShow();
+            }
+            else
+            {
+                openedShaderMapper = new ShaderMapperEditor();
+                openedShaderMapper.Window.Parent = Window;
+                openedShaderMapper.BuiltinMapList = builtinMapList;
+                openedShaderMapper.MaterialMapList = materialMapList;
+                openedShaderMapper.OwningMigrator = this;
+                openedShaderMapper.Show();
+            }
         }
 
         private void BrowseClicked()
@@ -64,6 +99,7 @@ namespace ContentMigratorEditor
 
         void InitializeMigration(string projectPath, string destinationPath)
         {
+            var projectFolder = Editor.Instance.ContentDatabase.Find(Editor.Instance.GameProject.ProjectFolderPath);
             Directory.CreateDirectory(destinationPath);
             var metaFiles = Directory.EnumerateFiles(projectPath, "*.meta", SearchOption.AllDirectories);
             var destinationMetaPath = Path.Join(destinationPath, targetMetaDir);
@@ -102,6 +138,7 @@ namespace ContentMigratorEditor
                 catch (Exception e) { }
                 File.Copy(metaFile, destFile);
             }
+            Editor.Instance.ContentDatabase.RefreshFolder(projectFolder, true);
         }
 
         private void MigrateClicked()
@@ -127,6 +164,7 @@ namespace ContentMigratorEditor
 
             textureMigrator.Migrate(assetsPath, targetPath);
             audioMigrator.Migrate(assetsPath, targetPath);
+            matMigrator.Migrate(assetsPath, targetPath);
 
             return;
             // var prefabFiles = Directory.EnumerateFiles(assetsPath, "*.prefab", SearchOption.AllDirectories);

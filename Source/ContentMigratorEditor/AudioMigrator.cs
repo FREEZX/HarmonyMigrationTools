@@ -29,6 +29,7 @@ class AudioMigrator : AssetMigratorBase
     var audioFiles = Directory.
         EnumerateFiles(assetsPath, "*", SearchOption.AllDirectories).
         Where(fileName => handledExtensions.Any(pattern => FileSystemName.MatchesSimpleExpression(pattern, fileName)));
+    var destinationFolder = Editor.Instance.ContentDatabase.Find(destinationPath);
 
     bool metaErrors = false;
     foreach (var audioFile in audioFiles)
@@ -65,6 +66,7 @@ class AudioMigrator : AssetMigratorBase
       importRequest.Settings = importSettings;
       var targetDirectory = Path.GetDirectoryName(newProjectRelativePath);
       Directory.CreateDirectory(targetDirectory);
+      Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
       var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
       Editor.Instance.ContentImporting.Import(audioFile, contentFolder, false, importSettings);
       var importEntry = TextureImportEntry.CreateEntry(ref importRequest);
