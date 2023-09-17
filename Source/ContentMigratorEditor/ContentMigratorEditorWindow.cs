@@ -35,6 +35,7 @@ namespace ContentMigratorEditor
         public override void Initialize(LayoutElementsContainer layout)
         {
             builtinMapList = MaterialMigrator.DefaultBuiltinMaterials.ToList();
+            materialMapList = MaterialMigrator.DefaultGuidMaterials.ToList();
             projectPathTextbox = layout.TextBox();
             var browseBtn = layout.Button("Browse");
             browseBtn.Button.Clicked += BrowseClicked;

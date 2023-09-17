@@ -20,6 +20,7 @@ namespace ContentMigratorEditor
   public class GuidMaterial
   {
     public string Guid;
+    public string ShaderName; // User-friendly name
     public Material Material;
   }
 
@@ -50,12 +51,24 @@ namespace ContentMigratorEditor
       }
     }
 
+    public static GuidMaterial[] DefaultGuidMaterials
+    {
+      get
+      {
+        return new GuidMaterial[]{
+          new GuidMaterial() {
+            Guid = "GUIDHERE",
+            ShaderName = "Standard",
+            Material = LoadBuiltinShader("Standard.flax")
+        }
+        };
+      }
+    }
+
     protected static Material LoadBuiltinShader(string name)
     {
       var materialPath = Path.Join(Path.GetFullPath(Editor.Instance.GameProject.ProjectFolderPath), "Content", "MigratorAssets", name);
       var assetItem = Editor.Instance.ContentDatabase.Find(materialPath) as AssetItem;
-      Debug.Log(assetItem);
-      Debug.Log(materialPath);
       return FlaxEngine.Content.LoadAsync(assetItem.ID) as Material;
     }
 

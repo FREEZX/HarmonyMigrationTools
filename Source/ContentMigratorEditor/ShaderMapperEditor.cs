@@ -58,6 +58,7 @@ namespace ContentMigratorEditor
           Parent = hPanel.Panel,
           Height = 45,
         };
+        picker.SelectedItem = Editor.Instance.ContentDatabase.FindAsset(BuiltinMapList[idx].Material.ID);
         picker.SelectedItemChanged += () =>
         {
           BuiltinMapList[idx].Material = picker.SelectedAsset as Material;
@@ -80,18 +81,31 @@ namespace ContentMigratorEditor
       {
         var idx = i;
         var hPanel = otherShadersVPanel.HorizontalPanel();
+        hPanel.Label("Name");
+        var nameTextBox = hPanel.TextBox();
+        nameTextBox.Text = MaterialMapList[idx].ShaderName;
+        nameTextBox.Control.Size = new Float2(200, 10);
+        nameTextBox.TextBox.TextChanged += () =>
+        {
+          MaterialMapList[idx].ShaderName = nameTextBox.Text;
+        };
+        hPanel.Space(20);
         hPanel.Label("Guid");
         var guidTextBox = hPanel.TextBox();
+        guidTextBox.Text = MaterialMapList[idx].Guid;
         guidTextBox.Control.Size = new Float2(300, 10);
         guidTextBox.TextBox.TextChanged += () =>
         {
           MaterialMapList[idx].Guid = guidTextBox.Text;
         };
+
+
         var picker = new AssetPicker(new ScriptType(typeof(Material)), new Float2(200, 2.5f))
         {
           Parent = hPanel.Panel,
           Height = 45,
         };
+        picker.SelectedItem = Editor.Instance.ContentDatabase.FindAsset(MaterialMapList[idx].Material.ID);
         picker.SelectedItemChanged += () =>
         {
           MaterialMapList[idx].Material = picker.SelectedAsset as Material;
