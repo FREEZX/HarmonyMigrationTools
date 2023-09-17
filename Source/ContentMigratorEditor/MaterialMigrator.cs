@@ -1,4 +1,5 @@
 
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
@@ -37,6 +38,14 @@ namespace ContentMigratorEditor
       "*.mat",
     };
 
+    // Some known FileIds for builtin mats:
+    // 45 - Standard Specular
+    // 46 - Standard
+    // 10701 - VertexLit
+    // 10750 - Unlit/Transparent
+    // 10751 - Unlit/Transparent Cutout
+    // 10752 - Unlit/Texture
+    // 10755 - Unlit/Color
     public static BuiltinMaterial[] DefaultBuiltinMaterials
     {
       get
@@ -65,6 +74,17 @@ namespace ContentMigratorEditor
       }
     }
 
+    public static Material FallbackMaterial
+    {
+      get
+      {
+        return LoadBuiltinShader("Standard.flax");
+      }
+    }
+
+    public BuiltinMaterial[] BuiltinMaterials;
+    public GuidMaterial[] GuidMaterials;
+
     protected static Material LoadBuiltinShader(string name)
     {
       var materialPath = Path.Join(Path.GetFullPath(Editor.Instance.GameProject.ProjectFolderPath), "Content", "MigratorAssets", name);
@@ -75,12 +95,21 @@ namespace ContentMigratorEditor
 
     public override void Migrate(string assetsPath, string destinationPath)
     {
-
       var assetsDir = new DirectoryInfo(assetsPath);
       var materialFiles = Directory.
           EnumerateFiles(assetsPath, "*", SearchOption.AllDirectories).
           Where(fileName => handledExtensions.Any(pattern => FileSystemName.MatchesSimpleExpression(pattern, fileName)));
       var destinationFolder = Editor.Instance.ContentDatabase.Find(destinationPath);
+      var builtinDictionary = new Dictionary<int, Material>();
+      foreach (var builtinMat in BuiltinMaterials)
+      {
+        builtinDictionary[builtinMat.FileId] = builtinMat.Material;
+      }
+      var guidMatsDictionary = new Dictionary<string, Material>();
+      foreach (var guidMat in GuidMaterials)
+      {
+        guidMatsDictionary[guidMat.Guid] = guidMat.Material;
+      }
 
       bool metaErrors = false;
       foreach (var matFile in materialFiles)
@@ -107,33 +136,31 @@ namespace ContentMigratorEditor
 
         var matShaderGuid = matShader["guid"];
         var matShaderFileId = matShader["fileId"];
+
+        string matShaderGuidStr = (matShaderGuid as YamlScalarNode).Value;
+        Material shaderForMaterial;
         // Special case: Unity builtin shaders 
-        if ((matShaderGuid as YamlScalarNode).Value == "0000000000000000f000000000000000")
+        if (matShaderGuidStr == "0000000000000000f000000000000000")
         {
           var shaderFileId = int.Parse((matShaderFileId as YamlScalarNode).Value);
-          switch (shaderFileId)
+
+          if (!builtinDictionary.ContainsKey(shaderFileId))
           {
-            case 45:
-              // Standard specular
-              break;
-            case 46:
-              // Standard
-              break;
-            case 10701:
-              // VertexLit
-              break;
-            case 10752:
-              // Unlit/Texture
-              break;
-            case 10750:
-              // Unlit/Transparent
-              break;
-            case 10751:
-              // Unlit/Transparent Cutout
-              break;
-            case 10755:
-              // Unlit/Color
-              break;
+            shaderFileId = 46; // Revert to standard
+          }
+          shaderForMaterial = builtinDictionary[shaderFileId];
+        }
+        else
+        {
+          if (!guidMatsDictionary.ContainsKey(matShaderGuidStr))
+          {
+            // No special mat defined. Fallback
+            Debug.LogWarning($"Material not found for shader {matShaderGuidStr}. Using standard.");
+            shaderForMaterial = FallbackMaterial;
+          }
+          else
+          {
+            shaderForMaterial = guidMatsDictionary[matShaderGuidStr];
           }
         }
 
@@ -141,17 +168,17 @@ namespace ContentMigratorEditor
         var newProjectRelativePath = Path.Join(destinationPath, assetsRelativePath);
 
         // Import
-        Request importRequest = new Request();
-        importRequest.InputPath = matFile;
-        importRequest.OutputPath = newProjectRelativePath;
-        importRequest.SkipSettingsDialog = true;
+        // var matProxy = Editor.Instance.ContentDatabase.GetProxy<Material>();
+
+        // var materialInstanceProxy = Editor.Instance.ContentDatabase.GetProxy<MaterialInstance>();
+        // Editor.Instance.Windows.ContentWin.NewItem(materialInstanceProxy, null, item => OnMaterialInstanceCreated(item, materialItem), Path.GetFileNameWithoutExtension(matFile));
+        // MaterialProxy.CreateMaterialInstance(
+        // (shaderForMaterial);
 
         var targetDirectory = Path.GetDirectoryName(newProjectRelativePath);
         Directory.CreateDirectory(targetDirectory);
         Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
         var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
-        var importEntry = TextureImportEntry.CreateEntry(ref importRequest);
-        bool success = importEntry.Import();
       }
       if (metaErrors)
       {

@@ -28,14 +28,14 @@ namespace ContentMigratorEditor
         private AudioMigrator audioMigrator = new AudioMigrator();
         private MaterialMigrator matMigrator = new MaterialMigrator();
 
-        private List<BuiltinMaterial> builtinMapList = new List<BuiltinMaterial>();
-        private List<GuidMaterial> materialMapList = new List<GuidMaterial>();
+        private List<BuiltinMaterial> builtinMatList = new List<BuiltinMaterial>();
+        private List<GuidMaterial> materialMatList = new List<GuidMaterial>();
         private ShaderMapperEditor openedShaderMapper;
 
         public override void Initialize(LayoutElementsContainer layout)
         {
-            builtinMapList = MaterialMigrator.DefaultBuiltinMaterials.ToList();
-            materialMapList = MaterialMigrator.DefaultGuidMaterials.ToList();
+            builtinMatList = MaterialMigrator.DefaultBuiltinMaterials.ToList();
+            materialMatList = MaterialMigrator.DefaultGuidMaterials.ToList();
             projectPathTextbox = layout.TextBox();
             var browseBtn = layout.Button("Browse");
             browseBtn.Button.Clicked += BrowseClicked;
@@ -72,8 +72,8 @@ namespace ContentMigratorEditor
             {
                 openedShaderMapper = new ShaderMapperEditor();
                 openedShaderMapper.Window.Parent = Window;
-                openedShaderMapper.BuiltinMapList = builtinMapList;
-                openedShaderMapper.MaterialMapList = materialMapList;
+                openedShaderMapper.BuiltinMapList = builtinMatList;
+                openedShaderMapper.MaterialMapList = materialMatList;
                 openedShaderMapper.OwningMigrator = this;
                 openedShaderMapper.Show();
             }
@@ -165,6 +165,9 @@ namespace ContentMigratorEditor
 
             textureMigrator.Migrate(assetsPath, targetPath);
             audioMigrator.Migrate(assetsPath, targetPath);
+
+            matMigrator.GuidMaterials = materialMatList.ToArray();
+            matMigrator.BuiltinMaterials = builtinMatList.ToArray();
             matMigrator.Migrate(assetsPath, targetPath);
 
             return;
