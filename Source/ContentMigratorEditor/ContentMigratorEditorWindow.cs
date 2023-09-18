@@ -142,7 +142,7 @@ namespace ContentMigratorEditor
             Editor.Instance.ContentDatabase.RefreshFolder(projectFolder, true);
         }
 
-        private void MigrateClicked()
+        private async void MigrateClicked()
         {
             var path = Path.GetFullPath(projectPathTextbox.Text);
             var assetsPath = Path.GetFullPath(Path.Join(path, "Assets"));
@@ -163,12 +163,12 @@ namespace ContentMigratorEditor
 
             InitializeMigration(assetsPath, targetPath);
 
-            textureMigrator.Migrate(assetsPath, targetPath);
-            audioMigrator.Migrate(assetsPath, targetPath);
+            await textureMigrator.Migrate(assetsPath, targetPath);
+            await audioMigrator.Migrate(assetsPath, targetPath);
 
             matMigrator.GuidMaterials = materialMatList.ToArray();
             matMigrator.BuiltinMaterials = builtinMatList.ToArray();
-            matMigrator.Migrate(assetsPath, targetPath);
+            await matMigrator.Migrate(assetsPath, targetPath);
 
             return;
             // var prefabFiles = Directory.EnumerateFiles(assetsPath, "*.prefab", SearchOption.AllDirectories);

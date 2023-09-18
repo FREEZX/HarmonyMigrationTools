@@ -1,6 +1,7 @@
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
+using System.Threading.Tasks;
 using FlaxEditor;
 using FlaxEditor.Content;
 using FlaxEditor.Content.Import;
@@ -22,7 +23,7 @@ class AudioMigrator : AssetMigratorBase
     "*.mp3",
   };
 
-  public override void Migrate(string assetsPath, string destinationPath)
+  public override async Task Migrate(string assetsPath, string destinationPath)
   {
 
     var assetsDir = new DirectoryInfo(assetsPath);

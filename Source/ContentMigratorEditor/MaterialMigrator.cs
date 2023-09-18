@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using FlaxEditor;
 using FlaxEditor.Content;
 using FlaxEditor.Content.Import;
@@ -25,6 +27,7 @@ namespace ContentMigratorEditor
     public Material Material;
   }
 
+
   class MaterialMigrator : AssetMigratorBase
   {
     protected override string[] HandledExtensions
@@ -37,7 +40,6 @@ namespace ContentMigratorEditor
     string[] handledExtensions = new string[] {
       "*.mat",
     };
-
     // Some known FileIds for builtin mats:
     // 45 - Standard Specular
     // 46 - Standard
@@ -92,13 +94,39 @@ namespace ContentMigratorEditor
       return FlaxEngine.Content.LoadAsync(assetItem.ID) as Material;
     }
 
+    async Task<MaterialInstance> CreateMaterialInstance(MaterialBase materialBase, string matFile, string directory)
+    {
+      var materialInstanceProxy = Editor.Instance.ContentDatabase.GetProxy<MaterialInstance>();
+      TaskCompletionSource<MaterialInstance> tcs = new TaskCompletionSource<MaterialInstance>();
+      Editor.Instance.Windows.ContentWin.NewItem(materialInstanceProxy, null, item =>
+        {
+          var assetItem = (AssetItem)item;
+          var matInstance = FlaxEngine.Content.LoadAsync<MaterialInstance>(assetItem.ID);
+          // matInstance.BaseMaterial = materialBase;
+          // matInstance.Save();
+          tcs.SetResult(matInstance);
+        }, Path.GetFileNameWithoutExtension(matFile), false
+      );
+      var matInstance = await tcs.Task;
+      var moveList = new List<ContentItem>();
+      moveList.Add(Editor.Instance.ContentDatabase.FindAsset(matInstance.ID));
+      var newParent = Editor.Instance.ContentDatabase.Find(directory) as ContentFolder;
+      Editor.Instance.ContentDatabase.Move(moveList, newParent);
+      matInstance.Reload();
+      FlaxEngine.Content.LoadAsync<MaterialInstance>(matInstance.ID);
+      Debug.Log("MatBase: " + materialBase);
 
-    public override void Migrate(string assetsPath, string destinationPath)
+      // matInstance.BaseMaterial = materialBase;
+      // matInstance.Save();
+      return matInstance;
+    }
+
+    public override async Task Migrate(string assetsPath, string destinationPath)
     {
       var assetsDir = new DirectoryInfo(assetsPath);
       var materialFiles = Directory.
           EnumerateFiles(assetsPath, "*", SearchOption.AllDirectories).
-          Where(fileName => handledExtensions.Any(pattern => FileSystemName.MatchesSimpleExpression(pattern, fileName)));
+          Where(fileName => handledExtensions.Any(pattern => FileSystemName.MatchesSimpleExpression(pattern, fileName))).ToList();
       var destinationFolder = Editor.Instance.ContentDatabase.Find(destinationPath);
       var builtinDictionary = new Dictionary<int, Material>();
       foreach (var builtinMat in BuiltinMaterials)
@@ -112,8 +140,20 @@ namespace ContentMigratorEditor
       }
 
       bool metaErrors = false;
-      foreach (var matFile in materialFiles)
+      var processedMatInstances = new Dictionary<string, MaterialInstance>();
+
+      var maxIterations = 50000;
+      var currentIterations = 0;
+
+      while (materialFiles.Count > 0)
       {
+        ++currentIterations;
+        if (currentIterations > maxIterations)
+        {
+          Debug.Log($"MaterialMigrator max iterations exceeded. Current items in list: {materialFiles.Count}");
+        }
+        string matFile = materialFiles[0];
+        materialFiles.RemoveAt(0);
         var meta = $"{matFile}.meta";
         bool exists = File.Exists(meta);
         if (!exists)
@@ -124,61 +164,84 @@ namespace ContentMigratorEditor
         }
 
         var metaContents = File.OpenText(meta);
-        var deserializer = new YamlStream();
-        deserializer.Load(metaContents);
+        var metaDeserializer = new YamlStream();
+        metaDeserializer.Load(metaContents);
 
         var matContents = File.OpenText(matFile);
         var matDeserializer = new YamlStream();
         matDeserializer.Load(matContents);
 
+
         var matRootNode = matDeserializer.Documents[0].RootNode;
-        var matShader = matRootNode["Material"]["m_Shader"];
+        var matGuid = metaDeserializer.Documents[0].RootNode["guid"];
+        var matMaterialData = matRootNode["Material"];
+        var matShaderParent = matMaterialData["m_Parent"];
+        var matShaderParentGuid = (matShaderParent as YamlMappingNode).Children.ContainsKey("guid") ? matShaderParent["guid"] : null;
 
-        var matShaderGuid = matShader["guid"];
-        var matShaderFileId = matShader["fileId"];
+        MaterialBase parentMat = null;
 
-        string matShaderGuidStr = (matShaderGuid as YamlScalarNode).Value;
-        Material shaderForMaterial;
-        // Special case: Unity builtin shaders 
-        if (matShaderGuidStr == "0000000000000000f000000000000000")
+        if (matShaderParentGuid != null)
         {
-          var shaderFileId = int.Parse((matShaderFileId as YamlScalarNode).Value);
-
-          if (!builtinDictionary.ContainsKey(shaderFileId))
+          var node = matShaderParentGuid as YamlScalarNode;
+          if (!processedMatInstances.ContainsKey(node.Value))
           {
-            shaderFileId = 46; // Revert to standard
-          }
-          shaderForMaterial = builtinDictionary[shaderFileId];
-        }
-        else
-        {
-          if (!guidMatsDictionary.ContainsKey(matShaderGuidStr))
-          {
-            // No special mat defined. Fallback
-            Debug.LogWarning($"Material not found for shader {matShaderGuidStr}. Using standard.");
-            shaderForMaterial = FallbackMaterial;
+            // Skipping this file, parent not processed yet.
+            materialFiles.Add(matFile);
+            continue;
           }
           else
           {
-            shaderForMaterial = guidMatsDictionary[matShaderGuidStr];
+            // Parent processed. Use it as a parent
+            parentMat = FallbackMaterial;
           }
         }
+        else
+        {
+          var matShader = matMaterialData["m_Shader"];
+
+          var matShaderGuid = matShader["guid"];
+
+          string matShaderGuidStr = (matShaderGuid as YamlScalarNode).Value;
+          Material shaderForMaterial;
+          // Special case: Unity builtin shaders 
+          if (matShaderGuidStr == "0000000000000000f000000000000000")
+          {
+            Debug.Log("GuidStr means builtin!");
+            var matShaderFileId = (matShader as YamlMappingNode).Children.ContainsKey("fileID") ? matShader["fileID"] : null;
+            Debug.Log(matShader);
+            var shaderFileId = int.Parse((matShaderFileId as YamlScalarNode).Value);
+
+            if (!builtinDictionary.ContainsKey(shaderFileId))
+            {
+              shaderFileId = 46; // Revert to standard
+            }
+            shaderForMaterial = builtinDictionary[shaderFileId];
+          }
+          else
+          {
+            if (!guidMatsDictionary.ContainsKey(matShaderGuidStr))
+            {
+              // No special mat defined. Fallback
+              Debug.LogWarning($"Material not found for shader {matShaderGuidStr}. Using standard.");
+              shaderForMaterial = FallbackMaterial;
+            }
+            else
+            {
+              shaderForMaterial = guidMatsDictionary[matShaderGuidStr];
+            }
+          }
+          parentMat = shaderForMaterial;
+        }
+
 
         var assetsRelativePath = Path.GetRelativePath(assetsPath, matFile);
         var newProjectRelativePath = Path.Join(destinationPath, assetsRelativePath);
 
-        // Import
-        // var matProxy = Editor.Instance.ContentDatabase.GetProxy<Material>();
-
-        // var materialInstanceProxy = Editor.Instance.ContentDatabase.GetProxy<MaterialInstance>();
-        // Editor.Instance.Windows.ContentWin.NewItem(materialInstanceProxy, null, item => OnMaterialInstanceCreated(item, materialItem), Path.GetFileNameWithoutExtension(matFile));
-        // MaterialProxy.CreateMaterialInstance(
-        // (shaderForMaterial);
-
         var targetDirectory = Path.GetDirectoryName(newProjectRelativePath);
         Directory.CreateDirectory(targetDirectory);
         Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
-        var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
+        var instance = await CreateMaterialInstance(parentMat, matFile, targetDirectory);
+        processedMatInstances[(matGuid as YamlScalarNode).Value] = instance;
       }
       if (metaErrors)
       {

@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 abstract class AssetMigratorBase
 {
   protected abstract string[] HandledExtensions
@@ -5,5 +7,5 @@ abstract class AssetMigratorBase
     get;
   }
 
-  public abstract void Migrate(string assetsPath, string destinationPath);
+  public abstract Task Migrate(string assetsPath, string destinationPath);
 }
