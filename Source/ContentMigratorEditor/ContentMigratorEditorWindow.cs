@@ -27,6 +27,7 @@ namespace ContentMigratorEditor
         private TextureMigrator textureMigrator = new TextureMigrator();
         private AudioMigrator audioMigrator = new AudioMigrator();
         private MaterialMigrator matMigrator = new MaterialMigrator();
+        private ModelMigrator modelMigrator = new ModelMigrator();
 
         private List<BuiltinMaterial> builtinMatList = new List<BuiltinMaterial>();
         private List<GuidMaterial> materialMatList = new List<GuidMaterial>();
@@ -37,6 +38,7 @@ namespace ContentMigratorEditor
             textureMigrator.OwnerMigratorEditor = this;
             matMigrator.OwnerMigratorEditor = this;
             audioMigrator.OwnerMigratorEditor = this;
+            modelMigrator.OwnerMigratorEditor = this;
             builtinMatList = MaterialMigrator.DefaultBuiltinMaterials.ToList();
             materialMatList = MaterialMigrator.DefaultGuidMaterials.ToList();
             projectPathTextbox = layout.TextBox();
@@ -155,6 +157,7 @@ namespace ContentMigratorEditor
             matMigrator.GuidMaterials = materialMatList.ToArray();
             matMigrator.BuiltinMaterials = builtinMatList.ToArray();
             await matMigrator.Migrate(assetsPath, targetPath);
+            await modelMigrator.Migrate(assetsPath, targetPath);
 
             return;
             // var prefabFiles = Directory.EnumerateFiles(assetsPath, "*.prefab", SearchOption.AllDirectories);
