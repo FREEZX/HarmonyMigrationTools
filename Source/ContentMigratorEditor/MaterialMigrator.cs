@@ -1,5 +1,6 @@
 
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
@@ -265,6 +266,45 @@ namespace ContentMigratorEditor
               }
             }
             //Debug.Log(key);
+          }
+        }
+        var floatsSeq = savedProps["m_Floats"] as YamlSequenceNode;
+        foreach (var floatInfo in floatsSeq)
+        {
+          var floatMap = (floatInfo as YamlMappingNode);
+          foreach (var key in (floatMap as YamlMappingNode).Children.Keys)
+          {
+            Debug.Log(float.Parse((floatMap[key] as YamlScalarNode).Value));
+            instance.SetParameterValue((key as YamlScalarNode).Value, float.Parse((floatMap.Children[key] as YamlScalarNode).Value, CultureInfo.InvariantCulture.NumberFormat));
+          }
+        }
+        var intsSeq = savedProps["m_Ints"] as YamlSequenceNode;
+        foreach (var intInfo in intsSeq)
+        {
+          var intsMap = (intInfo as YamlMappingNode);
+          foreach (var key in (intsMap as YamlMappingNode).Children.Keys)
+          {
+            instance.SetParameterValue((key as YamlScalarNode).Value, int.Parse((intsMap.Children[key] as YamlScalarNode).Value));
+          }
+        }
+        var colorsSeq = savedProps["m_Colors"] as YamlSequenceNode;
+        foreach (var colorInfo in colorsSeq)
+        {
+          var intsMap = (colorInfo as YamlMappingNode);
+          foreach (var key in (intsMap as YamlMappingNode).Children.Keys)
+          {
+            var data = intsMap[key];
+
+            var r = (data["r"] as YamlScalarNode).Value;
+            var g = (data["g"] as YamlScalarNode).Value;
+            var b = (data["b"] as YamlScalarNode).Value;
+            var a = (data["a"] as YamlScalarNode).Value;
+            Debug.Log(intsMap);
+            instance.SetParameterValue((key as YamlScalarNode).Value, new Float4(
+                  float.Parse(r, CultureInfo.InvariantCulture),
+                  float.Parse(g, CultureInfo.InvariantCulture),
+                  float.Parse(b, CultureInfo.InvariantCulture),
+                  float.Parse(a, CultureInfo.InvariantCulture)));
           }
         }
         // Iterate and set Textures
