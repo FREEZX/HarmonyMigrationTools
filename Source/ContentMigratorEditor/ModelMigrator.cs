@@ -50,7 +50,6 @@ class ModelMigrator : AssetMigratorBase
 
   public override async Task Migrate(string assetsPath, string destinationPath)
   {
-
     var assetsDir = new DirectoryInfo(assetsPath);
     var modelFiles = Directory.
         EnumerateFiles(assetsPath, "*", SearchOption.AllDirectories).
@@ -94,6 +93,7 @@ class ModelMigrator : AssetMigratorBase
 
 
       var animations = modelImporterSettings["animations"] as YamlMappingNode;
+      var rootMotionNodeName = (animations["motionNodeName"] as YamlScalarNode).Value;
       var animClips = (animations["clipAnimations"] as YamlSequenceNode);
       if (animClips.Children.Count > 0)
       {
@@ -102,8 +102,9 @@ class ModelMigrator : AssetMigratorBase
 
       var animType = int.Parse((modelImporterSettings["animationType"] as YamlScalarNode).Value); // 0 - No anim, 1 = Legacy, 2 = Generic, 3 = Humanoid
 
-      var assetsRelativePath = Path.GetRelativePath(assetsPath, modelFile);
-      var newProjectRelativePath = Path.Join(destinationPath, assetsRelativePath);
+      var assetsRelativeDirPath = Path.GetRelativePath(assetsPath, Path.GetDirectoryName(modelFile));
+      var newProjectRelativePath = Path.Join(destinationPath, assetsRelativeDirPath);
+      Debug.Log(newProjectRelativePath);
 
       // Import
       Request importRequest = new Request();
@@ -121,17 +122,35 @@ class ModelMigrator : AssetMigratorBase
       importSettings.Settings.CalculateTangents = tangentImportMode != 2 && tangentImportMode != 0; // 0 = Import; 2 = None
       importSettings.Settings.ImportBlendShapes = importBlendShapes > 0;
       importRequest.Settings = importSettings;
-      var targetDirectory = Path.GetDirectoryName(newProjectRelativePath);
-      Directory.CreateDirectory(targetDirectory);
+
+      Directory.CreateDirectory(newProjectRelativePath);
       Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
-      var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
+      var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(newProjectRelativePath);
       Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, importSettings);
       var importEntry = ModelImportEntry.CreateEntry(ref importRequest);
       bool success = importEntry.Import();
 
-      if (animClips.Children.Count > 0)
+      foreach (var animClip in animClips)
       {
+        var animName = (animClip["name"] as YamlScalarNode).Value;
+        var animClipStartFrame = int.Parse((animClip["firstFrame"] as YamlScalarNode).Value);
+        var animClipEndFrame = int.Parse((animClip["lastFrame"] as YamlScalarNode).Value);
+        // Import
+        Request animImportRequest = new Request();
+        animImportRequest.InputPath = modelFile;
+        Debug.Log(Path.Join(newProjectRelativePath, Path.GetFileNameWithoutExtension(modelFile) + "_" + animName + ".flax"));
+        animImportRequest.OutputPath = Path.Join(newProjectRelativePath, Path.GetFileNameWithoutExtension(modelFile) + "_" + animName + ".flax");
+        animImportRequest.SkipSettingsDialog = true;
 
+        var animImportSettings = new ModelImportSettings();
+        // Import as model first.
+        animImportSettings.Settings.Type = FlaxEngine.Tools.ModelTool.ModelType.Animation;
+        animImportSettings.Settings.FramesRange = new Float2(animClipStartFrame, animClipEndFrame);
+        animImportSettings.Settings.EnableRootMotion = rootMotionNodeName.Length > 0;
+        animImportRequest.Settings = animImportSettings;
+        Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, animImportSettings);
+        var animImportEntry = ModelImportEntry.CreateEntry(ref animImportRequest);
+        bool animImportSuccess = animImportEntry.Import();
       }
     }
     if (metaErrors)

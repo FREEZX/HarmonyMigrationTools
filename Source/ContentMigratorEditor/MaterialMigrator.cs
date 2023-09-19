@@ -274,7 +274,7 @@ namespace ContentMigratorEditor
           var floatMap = (floatInfo as YamlMappingNode);
           foreach (var key in (floatMap as YamlMappingNode).Children.Keys)
           {
-            Debug.Log(float.Parse((floatMap[key] as YamlScalarNode).Value));
+            // Debug.Log(float.Parse((floatMap[key] as YamlScalarNode).Value));
             instance.SetParameterValue((key as YamlScalarNode).Value, float.Parse((floatMap.Children[key] as YamlScalarNode).Value, CultureInfo.InvariantCulture.NumberFormat));
           }
         }
@@ -299,7 +299,7 @@ namespace ContentMigratorEditor
             var g = (data["g"] as YamlScalarNode).Value;
             var b = (data["b"] as YamlScalarNode).Value;
             var a = (data["a"] as YamlScalarNode).Value;
-            Debug.Log(intsMap);
+            // Debug.Log(intsMap);
             instance.SetParameterValue((key as YamlScalarNode).Value, new Float4(
                   float.Parse(r, CultureInfo.InvariantCulture),
                   float.Parse(g, CultureInfo.InvariantCulture),
