@@ -91,33 +91,28 @@ namespace ContentMigratorEditor
     {
       var materialPath = Path.Join(Path.GetFullPath(Editor.Instance.GameProject.ProjectFolderPath), "Content", "MigratorAssets", name);
       var assetItem = Editor.Instance.ContentDatabase.Find(materialPath) as AssetItem;
-      return FlaxEngine.Content.LoadAsync(assetItem.ID) as Material;
+      return FlaxEngine.Content.Load(assetItem.ID) as Material;
     }
 
     async Task<MaterialInstance> CreateMaterialInstance(MaterialBase materialBase, string matFile, string directory)
     {
+      // Delete old mat in case it exists
+      var newParent = Editor.Instance.ContentDatabase.Find(directory) as ContentFolder;
       var materialInstanceProxy = Editor.Instance.ContentDatabase.GetProxy<MaterialInstance>();
       TaskCompletionSource<MaterialInstance> tcs = new TaskCompletionSource<MaterialInstance>();
       Editor.Instance.Windows.ContentWin.NewItem(materialInstanceProxy, null, item =>
         {
           var assetItem = (AssetItem)item;
-          var matInstance = FlaxEngine.Content.LoadAsync<MaterialInstance>(assetItem.ID);
-          // matInstance.BaseMaterial = materialBase;
-          // matInstance.Save();
+          var matInstance = FlaxEngine.Content.Load<MaterialInstance>(assetItem.ID);
           tcs.SetResult(matInstance);
         }, Path.GetFileNameWithoutExtension(matFile), false
       );
       var matInstance = await tcs.Task;
       var moveList = new List<ContentItem>();
       moveList.Add(Editor.Instance.ContentDatabase.FindAsset(matInstance.ID));
-      var newParent = Editor.Instance.ContentDatabase.Find(directory) as ContentFolder;
       Editor.Instance.ContentDatabase.Move(moveList, newParent);
-      matInstance.Reload();
-      FlaxEngine.Content.LoadAsync<MaterialInstance>(matInstance.ID);
-      Debug.Log("MatBase: " + materialBase);
-
-      // matInstance.BaseMaterial = materialBase;
-      // matInstance.Save();
+      matInstance.BaseMaterial = materialBase;
+      matInstance.Save();
       return matInstance;
     }
 
@@ -192,7 +187,7 @@ namespace ContentMigratorEditor
           else
           {
             // Parent processed. Use it as a parent
-            parentMat = FallbackMaterial;
+            parentMat = processedMatInstances[node.Value];
           }
         }
         else
@@ -241,6 +236,40 @@ namespace ContentMigratorEditor
         Directory.CreateDirectory(targetDirectory);
         Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
         var instance = await CreateMaterialInstance(parentMat, matFile, targetDirectory);
+
+        var savedProps = matMaterialData["m_SavedProperties"];
+        // Texture props
+        var texSeq = savedProps["m_TexEnvs"] as YamlSequenceNode;
+        foreach (var texInfo in texSeq)
+        {
+          foreach (var key in (texInfo as YamlMappingNode).Children.Keys)
+          {
+            var data = texInfo[key];
+
+            var texFile = data["m_Texture"] as YamlMappingNode;
+            var fileId = int.Parse((texFile["fileID"] as YamlScalarNode).Value);
+            if (fileId != 0)
+            {
+              bool hasGuid = (texFile.Children).ContainsKey("guid");
+              if (hasGuid)
+              {
+                string unityGuid = (texFile["guid"] as YamlScalarNode).Value;
+                // Load local texture, if possible
+                System.Guid flaxGuid = System.Guid.Empty;
+                bool success = OwnerMigratorEditor.unityFlaxGuidMap.TryGetValue(unityGuid, out flaxGuid);
+                if (success)
+                {
+                  var texture = FlaxEngine.Content.Load(flaxGuid) as Texture;
+                  instance.SetParameterValue((key as YamlScalarNode).Value, texture);
+                }
+              }
+            }
+            //Debug.Log(key);
+          }
+        }
+        // Iterate and set Textures
+        // for (int i = 0; i <)
+        // instance.SetParameterValue()
         processedMatInstances[(matGuid as YamlScalarNode).Value] = instance;
       }
       if (metaErrors)

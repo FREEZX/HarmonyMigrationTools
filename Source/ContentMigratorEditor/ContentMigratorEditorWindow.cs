@@ -20,10 +20,10 @@ namespace ContentMigratorEditor
         private TextBoxElement projectPathTextbox;
         private TextBoxElement targetDirTextbox;
 
-        private string metaMapCacheJson = "projectMetaMap.json";
-        private string targetMetaDir = "unityMeta";
-
-        private Dictionary<string, string> guidMap;
+        // private string metaMapCacheJson = "projectMetaMap.json";
+        // private string targetMetaDir = "unityMeta";
+        //
+        public Dictionary<string, System.Guid> unityFlaxGuidMap = new();
         private TextureMigrator textureMigrator = new TextureMigrator();
         private AudioMigrator audioMigrator = new AudioMigrator();
         private MaterialMigrator matMigrator = new MaterialMigrator();
@@ -34,6 +34,9 @@ namespace ContentMigratorEditor
 
         public override void Initialize(LayoutElementsContainer layout)
         {
+            textureMigrator.OwnerMigratorEditor = this;
+            matMigrator.OwnerMigratorEditor = this;
+            audioMigrator.OwnerMigratorEditor = this;
             builtinMatList = MaterialMigrator.DefaultBuiltinMaterials.ToList();
             materialMatList = MaterialMigrator.DefaultGuidMaterials.ToList();
             projectPathTextbox = layout.TextBox();
@@ -50,9 +53,27 @@ namespace ContentMigratorEditor
             var openShaderMapperBtn = layout.Button("Shader Mapper");
             openShaderMapperBtn.Button.Clicked += OpenShaderMapperClicked;
 
+            var clearPrevButton = layout.Button("Clear old migration (Required before migrating)", Color.Red);
+            clearPrevButton.Button.Clicked += ClearPrevMigrationClicked;
             var button = layout.Button("Migrate content", Color.Blue);
             button.Button.Clicked += MigrateClicked;
         }
+
+        public void RegisterProcessedAsset(string unityGuid, System.Guid flaxGuid)
+        {
+            unityFlaxGuidMap[unityGuid] = flaxGuid;
+        }
+
+        private void ClearPrevMigrationClicked()
+        {
+            var targetPath = Path.GetFullPath(targetDirTextbox.Text);
+            try
+            {
+                Directory.Delete(targetPath, true);
+            }
+            finally { }
+        }
+
 
         protected override void Deinitialize()
         {
@@ -101,44 +122,9 @@ namespace ContentMigratorEditor
         void InitializeMigration(string projectPath, string destinationPath)
         {
             var projectFolder = Editor.Instance.ContentDatabase.Find(Editor.Instance.GameProject.ProjectFolderPath);
+
+            var destFolder = Editor.Instance.ContentDatabase.Find(destinationPath);
             Directory.CreateDirectory(destinationPath);
-            var metaFiles = Directory.EnumerateFiles(projectPath, "*.meta", SearchOption.AllDirectories);
-            var destinationMetaPath = Path.Join(destinationPath, targetMetaDir);
-
-            guidMap = new Dictionary<string, string>();
-
-            var guidFilePath = Path.Join(destinationMetaPath, metaMapCacheJson);
-            if (File.Exists(guidFilePath))
-            {
-                using (StreamReader file = File.OpenText(guidFilePath))
-                using (JsonTextReader reader = new JsonTextReader(file))
-                {
-                    JObject o2 = (JObject)JToken.ReadFrom(reader);
-                    if (o2 != null)
-                    {
-                        foreach (var property in o2.Properties())
-                        {
-                            guidMap[property.Name] = property.Value<string>();
-                        }
-                    }
-                }
-            }
-
-            Directory.CreateDirectory(destinationMetaPath);
-            foreach (var metaFile in metaFiles)
-            {
-                var metaContents = File.OpenText(metaFile);
-                var deserializer = new YamlStream();
-                deserializer.Load(metaContents);
-                string guid = (deserializer.Documents[0].RootNode["guid"] as YamlScalarNode).Value;
-                string destFile = Path.Join(destinationMetaPath, guid);
-                try
-                {
-                    File.Delete(destFile);
-                }
-                catch (Exception e) { }
-                File.Copy(metaFile, destFile);
-            }
             Editor.Instance.ContentDatabase.RefreshFolder(projectFolder, true);
         }
 

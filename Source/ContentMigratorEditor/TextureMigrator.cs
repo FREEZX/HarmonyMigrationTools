@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
@@ -120,13 +121,32 @@ class TextureMigrator : AssetMigratorBase
       Directory.CreateDirectory(targetDirectory);
       Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
       var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
+
+      TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
+      Action<ContentItem> onContentAdded = (ContentItem contentItem) =>
+      {
+        if (Path.GetFileNameWithoutExtension(contentItem.Path) == Path.GetFileNameWithoutExtension(texFile))
+        {
+          tcs.SetResult(contentItem as AssetItem);
+        }
+      };
+      Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
       Editor.Instance.ContentImporting.Import(texFile, contentFolder, false, importSettings);
       var importEntry = TextureImportEntry.CreateEntry(ref importRequest);
-      bool success = importEntry.Import();
+      bool failed = importEntry.Import();
+      var assetItem = await tcs.Task;
+
+      Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
+      OwnerMigratorEditor.RegisterProcessedAsset((guid as YamlScalarNode).Value, (assetItem as AssetItem).ID);
     }
     if (metaErrors)
     {
       Debug.LogError("Meta errors. Migration stopping.");
     }
+  }
+
+  private void importFileEnd()
+  {
+    throw new NotImplementedException();
   }
 }
