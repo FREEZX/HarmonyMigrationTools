@@ -1,4 +1,5 @@
 
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -99,19 +100,22 @@ namespace ContentMigratorEditor
     {
       // Delete old mat in case it exists
       var newParent = Editor.Instance.ContentDatabase.Find(directory) as ContentFolder;
-      var materialInstanceProxy = Editor.Instance.ContentDatabase.GetProxy<MaterialInstance>();
-      TaskCompletionSource<MaterialInstance> tcs = new TaskCompletionSource<MaterialInstance>();
-      Editor.Instance.Windows.ContentWin.NewItem(materialInstanceProxy, null, item =>
+      MaterialInstanceProxy materialInstanceProxy = (MaterialInstanceProxy)Editor.Instance.ContentDatabase.GetProxy<MaterialInstance>();
+      var targetFile = Path.Join(directory, Path.GetFileNameWithoutExtension(matFile) + ".flax");
+      TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
+      Action<ContentItem> onContentAdded = (ContentItem contentItem) =>
+      {
+        if (Path.GetFileNameWithoutExtension(matFile) == Path.GetFileNameWithoutExtension(matFile))
         {
-          var assetItem = (AssetItem)item;
-          var matInstance = FlaxEngine.Content.Load<MaterialInstance>(assetItem.ID);
-          tcs.SetResult(matInstance);
-        }, Path.GetFileNameWithoutExtension(matFile), false
-      );
-      var matInstance = await tcs.Task;
-      var moveList = new List<ContentItem>();
-      moveList.Add(Editor.Instance.ContentDatabase.FindAsset(matInstance.ID));
-      Editor.Instance.ContentDatabase.Move(moveList, newParent);
+          tcs.SetResult(contentItem as AssetItem);
+        }
+      };
+      Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
+      materialInstanceProxy.Create(targetFile, null);
+      var assetItem = await tcs.Task;
+      Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
+      var matAsset = Editor.Instance.ContentDatabase.Find(targetFile) as AssetItem;
+      var matInstance = FlaxEngine.Content.Load(matAsset.ID) as MaterialInstance;
       matInstance.BaseMaterial = materialBase;
       matInstance.Save();
       return matInstance;
