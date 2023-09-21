@@ -109,7 +109,8 @@ class ModelMigrator : AssetMigratorBase
       // Import
       Request importRequest = new Request();
       importRequest.InputPath = modelFile;
-      importRequest.OutputPath = newProjectRelativePath;
+      importRequest.OutputPath = Path.Join(newProjectRelativePath, Path.GetFileNameWithoutExtension(modelFile) + ".flax");
+      Debug.Log("OutPath " + importRequest.OutputPath);
       importRequest.SkipSettingsDialog = true;
 
       var importSettings = new ModelImportSettings();
@@ -126,7 +127,7 @@ class ModelMigrator : AssetMigratorBase
       Directory.CreateDirectory(newProjectRelativePath);
       Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
       var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(newProjectRelativePath);
-      Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, importSettings);
+      // Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, importSettings);
       var importEntry = ModelImportEntry.CreateEntry(ref importRequest);
       bool success = importEntry.Import();
 
@@ -138,7 +139,6 @@ class ModelMigrator : AssetMigratorBase
         // Import
         Request animImportRequest = new Request();
         animImportRequest.InputPath = modelFile;
-        Debug.Log(Path.Join(newProjectRelativePath, Path.GetFileNameWithoutExtension(modelFile) + "_" + animName + ".flax"));
         animImportRequest.OutputPath = Path.Join(newProjectRelativePath, Path.GetFileNameWithoutExtension(modelFile) + "_" + animName + ".flax");
         animImportRequest.SkipSettingsDialog = true;
 
@@ -148,7 +148,7 @@ class ModelMigrator : AssetMigratorBase
         animImportSettings.Settings.FramesRange = new Float2(animClipStartFrame, animClipEndFrame);
         animImportSettings.Settings.EnableRootMotion = rootMotionNodeName.Length > 0;
         animImportRequest.Settings = animImportSettings;
-        Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, animImportSettings);
+        // Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, animImportSettings);
         var animImportEntry = ModelImportEntry.CreateEntry(ref animImportRequest);
         bool animImportSuccess = animImportEntry.Import();
       }

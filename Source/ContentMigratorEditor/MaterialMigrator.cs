@@ -105,7 +105,7 @@ namespace ContentMigratorEditor
       TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
       Action<ContentItem> onContentAdded = (ContentItem contentItem) =>
       {
-        if (Path.GetFileNameWithoutExtension(matFile) == Path.GetFileNameWithoutExtension(matFile))
+        if (Path.GetFileNameWithoutExtension(matFile) == Path.GetFileNameWithoutExtension(contentItem.Path))
         {
           tcs.SetResult(contentItem as AssetItem);
         }
@@ -253,6 +253,7 @@ namespace ContentMigratorEditor
 
             var texFile = data["m_Texture"] as YamlMappingNode;
             var fileId = int.Parse((texFile["fileID"] as YamlScalarNode).Value);
+            var propertyName = (key as YamlScalarNode).Value;
             if (fileId != 0)
             {
               bool hasGuid = (texFile.Children).ContainsKey("guid");
@@ -265,10 +266,18 @@ namespace ContentMigratorEditor
                 if (success)
                 {
                   var texture = FlaxEngine.Content.Load(flaxGuid) as Texture;
-                  instance.SetParameterValue((key as YamlScalarNode).Value, texture);
+                  instance.SetParameterValue(propertyName, texture);
                 }
               }
             }
+            var scaleX = float.Parse((data["m_Scale"]["x"] as YamlScalarNode).Value, CultureInfo.InvariantCulture);
+            var scaleY = float.Parse((data["m_Scale"]["y"] as YamlScalarNode).Value, CultureInfo.InvariantCulture);
+            var offsetX = float.Parse((data["m_Offset"]["x"] as YamlScalarNode).Value, CultureInfo.InvariantCulture);
+            var offsetY = float.Parse((data["m_Offset"]["y"] as YamlScalarNode).Value, CultureInfo.InvariantCulture);
+
+            instance.SetParameterValue($"{propertyName}_ST", new Float4(scaleX, scaleY, offsetX, offsetY));
+
+            // Tiling and offset
             //Debug.Log(key);
           }
         }
