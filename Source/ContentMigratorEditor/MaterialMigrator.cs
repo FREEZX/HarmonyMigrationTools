@@ -175,8 +175,10 @@ namespace ContentMigratorEditor
         var matRootNode = matDeserializer.Documents[0].RootNode;
         var matGuid = metaDeserializer.Documents[0].RootNode["guid"];
         var matMaterialData = matRootNode["Material"];
-        var matShaderParent = matMaterialData["m_Parent"];
-        var matShaderParentGuid = (matShaderParent as YamlMappingNode).Children.ContainsKey("guid") ? matShaderParent["guid"] : null;
+        YamlNode parentNode = null;
+        (matMaterialData as YamlMappingNode).Children.TryGetValue("m_Parent", out parentNode);
+        var matShaderParent = parentNode;
+        var matShaderParentGuid = matShaderParent != null && (matShaderParent as YamlMappingNode).Children.ContainsKey("guid") ? matShaderParent["guid"] : null;
 
         MaterialBase parentMat = null;
 
@@ -291,33 +293,42 @@ namespace ContentMigratorEditor
             instance.SetParameterValue((key as YamlScalarNode).Value, float.Parse((floatMap.Children[key] as YamlScalarNode).Value, CultureInfo.InvariantCulture.NumberFormat));
           }
         }
-        var intsSeq = savedProps["m_Ints"] as YamlSequenceNode;
-        foreach (var intInfo in intsSeq)
+
+        var hasInts = (savedProps as YamlMappingNode).Children.ContainsKey("m_Ints");
+        if (hasInts)
         {
-          var intsMap = (intInfo as YamlMappingNode);
-          foreach (var key in (intsMap as YamlMappingNode).Children.Keys)
+          var intsSeq = savedProps["m_Ints"] as YamlSequenceNode;
+          foreach (var intInfo in intsSeq)
           {
-            instance.SetParameterValue((key as YamlScalarNode).Value, int.Parse((intsMap.Children[key] as YamlScalarNode).Value));
+            var intsMap = (intInfo as YamlMappingNode);
+            foreach (var key in (intsMap as YamlMappingNode).Children.Keys)
+            {
+              instance.SetParameterValue((key as YamlScalarNode).Value, int.Parse((intsMap.Children[key] as YamlScalarNode).Value));
+            }
           }
         }
-        var colorsSeq = savedProps["m_Colors"] as YamlSequenceNode;
-        foreach (var colorInfo in colorsSeq)
+        var hasColors = (savedProps as YamlMappingNode).Children.ContainsKey("m_Colors");
+        if (hasColors)
         {
-          var intsMap = (colorInfo as YamlMappingNode);
-          foreach (var key in (intsMap as YamlMappingNode).Children.Keys)
+          var colorsSeq = savedProps["m_Colors"] as YamlSequenceNode;
+          foreach (var colorInfo in colorsSeq)
           {
-            var data = intsMap[key];
+            var intsMap = (colorInfo as YamlMappingNode);
+            foreach (var key in (intsMap as YamlMappingNode).Children.Keys)
+            {
+              var data = intsMap[key];
 
-            var r = (data["r"] as YamlScalarNode).Value;
-            var g = (data["g"] as YamlScalarNode).Value;
-            var b = (data["b"] as YamlScalarNode).Value;
-            var a = (data["a"] as YamlScalarNode).Value;
-            // Debug.Log(intsMap);
-            instance.SetParameterValue((key as YamlScalarNode).Value, new Float4(
-                  float.Parse(r, CultureInfo.InvariantCulture),
-                  float.Parse(g, CultureInfo.InvariantCulture),
-                  float.Parse(b, CultureInfo.InvariantCulture),
-                  float.Parse(a, CultureInfo.InvariantCulture)));
+              var r = (data["r"] as YamlScalarNode).Value;
+              var g = (data["g"] as YamlScalarNode).Value;
+              var b = (data["b"] as YamlScalarNode).Value;
+              var a = (data["a"] as YamlScalarNode).Value;
+              // Debug.Log(intsMap);
+              instance.SetParameterValue((key as YamlScalarNode).Value, new Float4(
+                    float.Parse(r, CultureInfo.InvariantCulture),
+                    float.Parse(g, CultureInfo.InvariantCulture),
+                    float.Parse(b, CultureInfo.InvariantCulture),
+                    float.Parse(a, CultureInfo.InvariantCulture)));
+            }
           }
         }
         // Iterate and set Textures
