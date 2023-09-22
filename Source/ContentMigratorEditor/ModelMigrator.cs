@@ -142,63 +142,67 @@ class ModelMigrator : AssetMigratorBase
         Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
         var importEntry = ModelImportEntry.CreateEntry(ref importRequest);
         bool success = importEntry.Import();
-        var modelAssetItem = await tcs.Task;
-        Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
-        var mdl = FlaxEngine.Content.Load(modelAssetItem.ID);
-        var assetMdl = mdl as Model;
-        var externalObjects = modelImporterSettings["externalObjects"] as YamlSequenceNode;
-        // Order in unity and flax may be different, so we need to map out the names first
-        var matNameGuidMap = new Dictionary<string, string>();
-
-        if (externalObjects != null)
+        if (success)
         {
-          foreach (var matNode in externalObjects)
-          {
-            var matNodeMap = matNode as YamlMappingNode;
-            if ((matNodeMap["first"]["type"] as YamlScalarNode).Value == "UnityEngine.Material")
-            {
-              matNameGuidMap[(matNodeMap["first"]["name"] as YamlScalarNode).Value] = (matNodeMap["second"]["guid"] as YamlScalarNode).Value;
-            }
-          }
 
-          for (int i = 0; i < assetMdl.MaterialSlots.Length; ++i)
+          var modelAssetItem = await tcs.Task;
+          Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
+          var mdl = FlaxEngine.Content.Load(modelAssetItem.ID);
+          var assetMdl = mdl as Model;
+          var externalObjects = modelImporterSettings["externalObjects"] as YamlSequenceNode;
+          // Order in unity and flax may be different, so we need to map out the names first
+          var matNameGuidMap = new Dictionary<string, string>();
+
+          if (externalObjects != null)
           {
-            string matGuid = null;
-            matNameGuidMap.TryGetValue(assetMdl.MaterialSlots[i].Name, out matGuid);
-            if (matGuid != null)
+            foreach (var matNode in externalObjects)
             {
-              // Check if material exists
-              System.Guid flaxGuid = System.Guid.Empty;
-              OwnerMigratorEditor.unityFlaxGuidMap.TryGetValue(matGuid, out flaxGuid);
-              if (flaxGuid != System.Guid.Empty)
+              var matNodeMap = matNode as YamlMappingNode;
+              if ((matNodeMap["first"]["type"] as YamlScalarNode).Value == "UnityEngine.Material")
               {
-                assetMdl.MaterialSlots[i].Material = FlaxEngine.Content.Load(flaxGuid) as MaterialInstance;
+                matNameGuidMap[(matNodeMap["first"]["name"] as YamlScalarNode).Value] = (matNodeMap["second"]["guid"] as YamlScalarNode).Value;
               }
             }
+
+            for (int i = 0; i < assetMdl.MaterialSlots.Length; ++i)
+            {
+              string matGuid = null;
+              matNameGuidMap.TryGetValue(assetMdl.MaterialSlots[i].Name, out matGuid);
+              if (matGuid != null)
+              {
+                // Check if material exists
+                System.Guid flaxGuid = System.Guid.Empty;
+                OwnerMigratorEditor.unityFlaxGuidMap.TryGetValue(matGuid, out flaxGuid);
+                if (flaxGuid != System.Guid.Empty)
+                {
+                  assetMdl.MaterialSlots[i].Material = FlaxEngine.Content.Load(flaxGuid) as MaterialInstance;
+                }
+              }
+            }
+            assetMdl.Save();
           }
-          assetMdl.Save();
-        }
 
-        foreach (var animClip in animClips)
-        {
-          var animName = (animClip["name"] as YamlScalarNode).Value;
-          var animClipStartFrame = int.Parse((animClip["firstFrame"] as YamlScalarNode).Value);
-          var animClipEndFrame = int.Parse((animClip["lastFrame"] as YamlScalarNode).Value);
-          // Import
-          Request animImportRequest = new Request();
-          animImportRequest.InputPath = modelFile;
-          animImportRequest.OutputPath = Path.Join(newProjectRelativePath, Path.GetFileNameWithoutExtension(modelFile) + "_" + animName + ".flax");
-          animImportRequest.SkipSettingsDialog = true;
+          foreach (var animClip in animClips)
+          {
+            var animName = (animClip["name"] as YamlScalarNode).Value;
+            var animClipStartFrame = int.Parse((animClip["firstFrame"] as YamlScalarNode).Value);
+            var animClipEndFrame = int.Parse((animClip["lastFrame"] as YamlScalarNode).Value);
+            // Import
+            Request animImportRequest = new Request();
+            animImportRequest.InputPath = modelFile;
+            animImportRequest.OutputPath = Path.Join(newProjectRelativePath, Path.GetFileNameWithoutExtension(modelFile) + "_" + animName + ".flax");
+            animImportRequest.SkipSettingsDialog = true;
 
-          var animImportSettings = new ModelImportSettings();
-          // Import as model first.
-          animImportSettings.Settings.Type = FlaxEngine.Tools.ModelTool.ModelType.Animation;
-          animImportSettings.Settings.FramesRange = new Float2(animClipStartFrame, animClipEndFrame);
-          animImportSettings.Settings.EnableRootMotion = rootMotionNodeName.Length > 0;
-          animImportRequest.Settings = animImportSettings;
-          // Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, animImportSettings);
-          var animImportEntry = ModelImportEntry.CreateEntry(ref animImportRequest);
-          bool animImportSuccess = animImportEntry.Import();
+            var animImportSettings = new ModelImportSettings();
+            // Import as model first.
+            animImportSettings.Settings.Type = FlaxEngine.Tools.ModelTool.ModelType.Animation;
+            animImportSettings.Settings.FramesRange = new Float2(animClipStartFrame, animClipEndFrame);
+            animImportSettings.Settings.EnableRootMotion = rootMotionNodeName.Length > 0;
+            animImportRequest.Settings = animImportSettings;
+            // Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, animImportSettings);
+            var animImportEntry = ModelImportEntry.CreateEntry(ref animImportRequest);
+            bool animImportSuccess = animImportEntry.Import();
+          }
         }
       }
       catch (Exception e)
