@@ -5,11 +5,9 @@ using System.Globalization;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using FlaxEditor;
 using FlaxEditor.Content;
-using FlaxEditor.Content.Import;
 using FlaxEngine;
 using YamlDotNet.RepresentationModel;
 

@@ -132,13 +132,13 @@ namespace ContentMigratorEditor
 
         private async void MigrateClicked()
         {
-            var path = Path.GetFullPath(projectPathTextbox.Text);
-            var assetsPath = Path.GetFullPath(Path.Join(path, "Assets"));
+            var path = Path.GetFullPath(projectPathTextbox.Text ?? "");
             if (!IsValidProject(path))
             {
                 MessageBox.Show("Invalid project!");
                 return;
             }
+            var assetsPath = Path.GetFullPath(Path.Join(path, "Assets"));
 
             var targetPath = Path.GetFullPath(targetDirTextbox.Text);
             var flaxProjectPath = Path.GetFullPath(Editor.Instance.GameProject.ProjectFolderPath);
