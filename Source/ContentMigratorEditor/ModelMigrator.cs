@@ -118,6 +118,7 @@ class ModelMigrator : AssetMigratorBase
         var importSettings = new ModelImportSettings();
         // Import as model first.
         importSettings.Settings.Type = animType == 0 ? FlaxEngine.Tools.ModelTool.ModelType.Model : FlaxEngine.Tools.ModelTool.ModelType.SkinnedModel;
+        Debug.Log($"Model file {modelFile} import type is {importSettings.Settings.Type}");
         importSettings.Settings.Scale = scale;
         importSettings.Settings.ImportMaterials = importMats > 0;
         importSettings.Settings.CalculateNormals = normalImportMode > 0;
@@ -128,23 +129,21 @@ class ModelMigrator : AssetMigratorBase
 
         TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
         Action<ContentItem> onContentAdded = null;
-        onContentAdded = (ContentItem contentItem) =>
-        {
-          Debug.Log("ContentAdded called! " + contentItem.Path);
-          if (Path.GetFileName(importRequest.OutputPath) == Path.GetFileName(contentItem.Path))
-          {
-            tcs.SetResult(contentItem as AssetItem);
-          }
-        };
 
         Directory.CreateDirectory(newProjectRelativePath);
         Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
         var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(newProjectRelativePath);
 
+        onContentAdded = (ContentItem contentItem) =>
+        {
+          if (Path.GetFileName(importRequest.OutputPath) == Path.GetFileName(contentItem.Path))
+          {
+            tcs.SetResult(contentItem as AssetItem);
+          }
+        };
         Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
         var importEntry = ModelImportEntry.CreateEntry(ref importRequest);
         bool importFailed = importEntry.Import();
-        Debug.Log($"Import model {modelFile} success: {!importFailed}!");
         if (importFailed)
         {
           Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
@@ -161,33 +160,27 @@ class ModelMigrator : AssetMigratorBase
 
           if (externalObjects != null)
           {
-            Debug.Log($"ExternalObjects exists on model {modelFile}!");
             foreach (var matNode in externalObjects)
             {
               var matNodeMap = matNode as YamlMappingNode;
               var firstTypeString = (matNodeMap["first"]["type"] as YamlScalarNode).Value;
               if (firstTypeString == "UnityEngine:Material")
               {
-                Debug.Log("Matnode is UnityEngine:Material");
                 var matName = (matNodeMap["first"]["name"] as YamlScalarNode).Value;
                 var matGuid = (matNodeMap["second"]["guid"] as YamlScalarNode).Value;
                 matNameGuidMap[matName] = matGuid;
-                Debug.Log($"MatnameGuidMap {matName} {matGuid}");
               }
             }
 
-            Debug.Log("MatSlots count " + assetMdl.MaterialSlots.Length);
             for (int i = 0; i < assetMdl.MaterialSlots.Length; ++i)
             {
               string matGuid = null;
               matNameGuidMap.TryGetValue(assetMdl.MaterialSlots[i].Name, out matGuid);
-              Debug.Log($"matGuid {assetMdl.MaterialSlots[i].Name} {matGuid}");
               if (matGuid != null)
               {
                 // Check if material exists
                 System.Guid flaxGuid = System.Guid.Empty;
                 OwnerMigratorEditor.unityFlaxGuidMap.TryGetValue(matGuid, out flaxGuid);
-                Debug.Log("FlaxGuid " + flaxGuid);
                 if (flaxGuid != System.Guid.Empty)
                 {
                   assetMdl.MaterialSlots[i].Material = FlaxEngine.Content.Load(flaxGuid) as MaterialInstance;
@@ -215,8 +208,21 @@ class ModelMigrator : AssetMigratorBase
             animImportSettings.Settings.EnableRootMotion = rootMotionNodeName.Length > 0;
             animImportRequest.Settings = animImportSettings;
             // Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, animImportSettings);
+            tcs = new();
+            Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
             var animImportEntry = ModelImportEntry.CreateEntry(ref animImportRequest);
-            bool animImportSuccess = animImportEntry.Import();
+            bool animImportFailed = animImportEntry.Import();
+            // if (animImportFailed)
+            // {
+            //   Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
+            // }
+            // else
+            // {
+            //   var asset = await tcs.Task;
+            //   var animAsset = FlaxEngine.Content.Load(asset.ID);
+            //   var animModel = animAsset as SkinnedModel;
+            //   animModel.
+            // }
           }
         }
       }
