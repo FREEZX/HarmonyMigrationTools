@@ -127,9 +127,11 @@ class ModelMigrator : AssetMigratorBase
         importRequest.Settings = importSettings;
 
         TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
-        Action<ContentItem> onContentAdded = (ContentItem contentItem) =>
+        Action<ContentItem> onContentAdded = null;
+        onContentAdded = (ContentItem contentItem) =>
         {
-          if (Path.GetFileNameWithoutExtension(modelFile) == Path.GetFileNameWithoutExtension(contentItem.Path))
+          Debug.Log("ContentAdded called! " + contentItem.Path);
+          if (Path.GetFileName(importRequest.OutputPath) == Path.GetFileName(contentItem.Path))
           {
             tcs.SetResult(contentItem as AssetItem);
           }
@@ -138,13 +140,17 @@ class ModelMigrator : AssetMigratorBase
         Directory.CreateDirectory(newProjectRelativePath);
         Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
         var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(newProjectRelativePath);
-        // Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, importSettings);
+
         Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
         var importEntry = ModelImportEntry.CreateEntry(ref importRequest);
-        bool success = importEntry.Import();
-        if (success)
+        bool importFailed = importEntry.Import();
+        Debug.Log($"Import model {modelFile} success: {!importFailed}!");
+        if (importFailed)
         {
-
+          Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
+        }
+        else
+        {
           var modelAssetItem = await tcs.Task;
           Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
           var mdl = FlaxEngine.Content.Load(modelAssetItem.ID);
@@ -155,24 +161,33 @@ class ModelMigrator : AssetMigratorBase
 
           if (externalObjects != null)
           {
+            Debug.Log($"ExternalObjects exists on model {modelFile}!");
             foreach (var matNode in externalObjects)
             {
               var matNodeMap = matNode as YamlMappingNode;
-              if ((matNodeMap["first"]["type"] as YamlScalarNode).Value == "UnityEngine.Material")
+              var firstTypeString = (matNodeMap["first"]["type"] as YamlScalarNode).Value;
+              if (firstTypeString == "UnityEngine:Material")
               {
-                matNameGuidMap[(matNodeMap["first"]["name"] as YamlScalarNode).Value] = (matNodeMap["second"]["guid"] as YamlScalarNode).Value;
+                Debug.Log("Matnode is UnityEngine:Material");
+                var matName = (matNodeMap["first"]["name"] as YamlScalarNode).Value;
+                var matGuid = (matNodeMap["second"]["guid"] as YamlScalarNode).Value;
+                matNameGuidMap[matName] = matGuid;
+                Debug.Log($"MatnameGuidMap {matName} {matGuid}");
               }
             }
 
+            Debug.Log("MatSlots count " + assetMdl.MaterialSlots.Length);
             for (int i = 0; i < assetMdl.MaterialSlots.Length; ++i)
             {
               string matGuid = null;
               matNameGuidMap.TryGetValue(assetMdl.MaterialSlots[i].Name, out matGuid);
+              Debug.Log($"matGuid {assetMdl.MaterialSlots[i].Name} {matGuid}");
               if (matGuid != null)
               {
                 // Check if material exists
                 System.Guid flaxGuid = System.Guid.Empty;
                 OwnerMigratorEditor.unityFlaxGuidMap.TryGetValue(matGuid, out flaxGuid);
+                Debug.Log("FlaxGuid " + flaxGuid);
                 if (flaxGuid != System.Guid.Empty)
                 {
                   assetMdl.MaterialSlots[i].Material = FlaxEngine.Content.Load(flaxGuid) as MaterialInstance;

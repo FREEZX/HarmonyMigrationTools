@@ -338,6 +338,10 @@ namespace ContentMigratorEditor
       {
         Debug.LogError("Meta errors. Migration stopping.");
       }
+      foreach (var processedKV in processedMatInstances)
+      {
+        OwnerMigratorEditor.unityFlaxGuidMap[processedKV.Key] = processedKV.Value.ID;
+      }
     }
   }
 }
