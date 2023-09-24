@@ -127,32 +127,17 @@ class ModelMigrator : AssetMigratorBase
         importSettings.Settings.ImportBlendShapes = importBlendShapes > 0;
         importRequest.Settings = importSettings;
 
-        TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
-        Action<ContentItem> onContentAdded = null;
 
         Directory.CreateDirectory(newProjectRelativePath);
         Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
         var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(newProjectRelativePath);
 
-        onContentAdded = (ContentItem contentItem) =>
-        {
-          if (Path.GetFileName(importRequest.OutputPath) == Path.GetFileName(contentItem.Path))
-          {
-            tcs.SetResult(contentItem as AssetItem);
-          }
-        };
-        Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
         var importEntry = ModelImportEntry.CreateEntry(ref importRequest);
         bool importFailed = importEntry.Import();
-        if (importFailed)
+        if (!importFailed)
         {
-          Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
-        }
-        else
-        {
-          var modelAssetItem = await tcs.Task;
-          Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
-          var mdl = FlaxEngine.Content.Load(modelAssetItem.ID);
+          // Flax
+          var mdl = FlaxEngine.Content.Load(importRequest.OutputPath);
           var assetMdl = mdl as Model;
           var externalObjects = modelImporterSettings["externalObjects"] as YamlSequenceNode;
           // Order in unity and flax may be different, so we need to map out the names first
@@ -188,6 +173,7 @@ class ModelMigrator : AssetMigratorBase
               }
             }
             assetMdl.Save();
+            OwnerMigratorEditor.unityFlaxGuidMap[(guid as YamlScalarNode).Value] = assetMdl.ID;
           }
 
           foreach (var animClip in animClips)
@@ -207,22 +193,8 @@ class ModelMigrator : AssetMigratorBase
             animImportSettings.Settings.FramesRange = new Float2(animClipStartFrame, animClipEndFrame);
             animImportSettings.Settings.EnableRootMotion = rootMotionNodeName.Length > 0;
             animImportRequest.Settings = animImportSettings;
-            // Editor.Instance.ContentImporting.Import(modelFile, contentFolder, false, animImportSettings);
-            tcs = new();
-            Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
             var animImportEntry = ModelImportEntry.CreateEntry(ref animImportRequest);
             bool animImportFailed = animImportEntry.Import();
-            // if (animImportFailed)
-            // {
-            //   Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
-            // }
-            // else
-            // {
-            //   var asset = await tcs.Task;
-            //   var animAsset = FlaxEngine.Content.Load(asset.ID);
-            //   var animModel = animAsset as SkinnedModel;
-            //   animModel.
-            // }
           }
         }
       }

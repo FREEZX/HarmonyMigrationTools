@@ -81,7 +81,7 @@ class TextureMigrator : AssetMigratorBase
       // Import
       Request importRequest = new Request();
       importRequest.InputPath = texFile;
-      importRequest.OutputPath = newProjectRelativePath;
+      importRequest.OutputPath = Path.Join(Path.GetDirectoryName(newProjectRelativePath), Path.GetFileNameWithoutExtension(newProjectRelativePath) + ".flax");
       importRequest.SkipSettingsDialog = true;
 
       var importSettings = new TextureImportSettings();
@@ -121,23 +121,33 @@ class TextureMigrator : AssetMigratorBase
       Directory.CreateDirectory(targetDirectory);
       Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
       var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
-
-      TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
-      Action<ContentItem> onContentAdded = (ContentItem contentItem) =>
-      {
-        if (Path.GetFileNameWithoutExtension(contentItem.Path) == Path.GetFileNameWithoutExtension(texFile))
-        {
-          tcs.SetResult(contentItem as AssetItem);
-        }
-      };
-      Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
-      Editor.Instance.ContentImporting.Import(texFile, contentFolder, false, importSettings);
+      //
+      // TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
+      // Action<ContentItem> onContentAdded = (ContentItem contentItem) =>
+      // {
+      //   if (Path.GetFileNameWithoutExtension(contentItem.Path) == Path.GetFileNameWithoutExtension(texFile))
+      //   {
+      //     tcs.SetResult(contentItem as AssetItem);
+      //   }
+      // };
+      // Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
+      // Editor.Instance.ContentImporting.Import(texFile, contentFolder, false, importSettings);
       var importEntry = TextureImportEntry.CreateEntry(ref importRequest);
       bool failed = importEntry.Import();
-      var assetItem = await tcs.Task;
+      if (!failed)
+      {
 
-      Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
-      OwnerMigratorEditor.RegisterProcessedAsset((guid as YamlScalarNode).Value, (assetItem as AssetItem).ID);
+        // var assetItem = await tcs.Task;
+        var assetItem = FlaxEngine.Content.Load(importRequest.OutputPath);
+
+        // Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
+        OwnerMigratorEditor.unityFlaxGuidMap[(guid as YamlScalarNode).Value] = assetItem.ID;
+        // OwnerMigratorEditor (, (assetItem as AssetItem).ID);
+      }
+      else
+      {
+        Debug.LogError("Failed to load texture " + texFile);
+      }
     }
     if (metaErrors)
     {

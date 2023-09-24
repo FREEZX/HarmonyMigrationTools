@@ -28,6 +28,7 @@ namespace ContentMigratorEditor
         private AudioMigrator audioMigrator = new AudioMigrator();
         private MaterialMigrator matMigrator = new MaterialMigrator();
         private ModelMigrator modelMigrator = new ModelMigrator();
+        private PrefabMigrator prefabMigrator = new PrefabMigrator();
 
         private List<BuiltinMaterial> builtinMatList = new List<BuiltinMaterial>();
         private List<GuidMaterial> materialMatList = new List<GuidMaterial>();
@@ -39,6 +40,7 @@ namespace ContentMigratorEditor
             matMigrator.OwnerMigratorEditor = this;
             audioMigrator.OwnerMigratorEditor = this;
             modelMigrator.OwnerMigratorEditor = this;
+            prefabMigrator.OwnerMigratorEditor = this;
             builtinMatList = MaterialMigrator.DefaultBuiltinMaterials.ToList();
             materialMatList = MaterialMigrator.DefaultGuidMaterials.ToList();
             projectPathTextbox = layout.TextBox();
@@ -132,32 +134,40 @@ namespace ContentMigratorEditor
 
         private async void MigrateClicked()
         {
-            var path = Path.GetFullPath(projectPathTextbox.Text ?? "");
-            if (!IsValidProject(path))
+            try
             {
-                MessageBox.Show("Invalid project!");
-                return;
+                var path = Path.GetFullPath(projectPathTextbox.Text ?? "");
+                if (!IsValidProject(path))
+                {
+                    MessageBox.Show("Invalid project!");
+                    return;
+                }
+                var assetsPath = Path.GetFullPath(Path.Join(path, "Assets"));
+
+                var targetPath = Path.GetFullPath(targetDirTextbox.Text);
+                var flaxProjectPath = Path.GetFullPath(Editor.Instance.GameProject.ProjectFolderPath);
+
+                if (!targetPath.StartsWith(flaxProjectPath))
+                {
+                    MessageBox.Show("Invalid target path!");
+                    return;
+                }
+
+                InitializeMigration(assetsPath, targetPath);
+
+                await textureMigrator.Migrate(assetsPath, targetPath);
+                await audioMigrator.Migrate(assetsPath, targetPath);
+
+                matMigrator.GuidMaterials = materialMatList.ToArray();
+                matMigrator.BuiltinMaterials = builtinMatList.ToArray();
+                await matMigrator.Migrate(assetsPath, targetPath);
+                await modelMigrator.Migrate(assetsPath, targetPath);
+                await prefabMigrator.Migrate(assetsPath, targetPath);
             }
-            var assetsPath = Path.GetFullPath(Path.Join(path, "Assets"));
-
-            var targetPath = Path.GetFullPath(targetDirTextbox.Text);
-            var flaxProjectPath = Path.GetFullPath(Editor.Instance.GameProject.ProjectFolderPath);
-
-            if (!targetPath.StartsWith(flaxProjectPath))
+            catch (Exception e)
             {
-                MessageBox.Show("Invalid target path!");
-                return;
+                Debug.LogError(e);
             }
-
-            InitializeMigration(assetsPath, targetPath);
-
-            await textureMigrator.Migrate(assetsPath, targetPath);
-            await audioMigrator.Migrate(assetsPath, targetPath);
-
-            matMigrator.GuidMaterials = materialMatList.ToArray();
-            matMigrator.BuiltinMaterials = builtinMatList.ToArray();
-            await matMigrator.Migrate(assetsPath, targetPath);
-            await modelMigrator.Migrate(assetsPath, targetPath);
 
             return;
             // var prefabFiles = Directory.EnumerateFiles(assetsPath, "*.prefab", SearchOption.AllDirectories);

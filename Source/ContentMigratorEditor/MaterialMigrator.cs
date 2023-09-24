@@ -94,26 +94,14 @@ namespace ContentMigratorEditor
       return FlaxEngine.Content.Load(assetItem.ID) as Material;
     }
 
-    async Task<MaterialInstance> CreateMaterialInstance(MaterialBase materialBase, string matFile, string directory)
+    protected MaterialInstance CreateMaterialInstance(MaterialBase materialBase, string matFile, string directory)
     {
       // Delete old mat in case it exists
       var newParent = Editor.Instance.ContentDatabase.Find(directory) as ContentFolder;
       MaterialInstanceProxy materialInstanceProxy = (MaterialInstanceProxy)Editor.Instance.ContentDatabase.GetProxy<MaterialInstance>();
       var targetFile = Path.Join(directory, Path.GetFileNameWithoutExtension(matFile) + ".flax");
-      TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
-      Action<ContentItem> onContentAdded = (ContentItem contentItem) =>
-      {
-        if (Path.GetFileNameWithoutExtension(matFile) == Path.GetFileNameWithoutExtension(contentItem.Path))
-        {
-          tcs.SetResult(contentItem as AssetItem);
-        }
-      };
-      Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
       materialInstanceProxy.Create(targetFile, null);
-      var assetItem = await tcs.Task;
-      Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
-      var matAsset = Editor.Instance.ContentDatabase.Find(targetFile) as AssetItem;
-      var matInstance = FlaxEngine.Content.Load(matAsset.ID) as MaterialInstance;
+      var matInstance = FlaxEngine.Content.Load(targetFile) as MaterialInstance;
       matInstance.BaseMaterial = materialBase;
       matInstance.Save();
       return matInstance;
@@ -232,6 +220,10 @@ namespace ContentMigratorEditor
           }
           parentMat = shaderForMaterial;
         }
+        if (parentMat == null)
+        {
+          parentMat = FallbackMaterial;
+        }
 
 
         var assetsRelativePath = Path.GetRelativePath(assetsPath, matFile);
@@ -240,7 +232,7 @@ namespace ContentMigratorEditor
         var targetDirectory = Path.GetDirectoryName(newProjectRelativePath);
         Directory.CreateDirectory(targetDirectory);
         Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
-        var instance = await CreateMaterialInstance(parentMat, matFile, targetDirectory);
+        var instance = CreateMaterialInstance(parentMat, matFile, targetDirectory);
 
         var savedProps = matMaterialData["m_SavedProperties"];
         // Texture props
@@ -330,8 +322,6 @@ namespace ContentMigratorEditor
           }
         }
         // Iterate and set Textures
-        // for (int i = 0; i <)
-        // instance.SetParameterValue()
         processedMatInstances[(matGuid as YamlScalarNode).Value] = instance;
       }
       if (metaErrors)

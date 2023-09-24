@@ -1,11 +1,11 @@
 
+using System;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
 using System.Threading.Tasks;
 using FlaxEditor;
 using FlaxEditor.Content;
-using FlaxEditor.Content.Import;
 using FlaxEngine;
 using YamlDotNet.RepresentationModel;
 
@@ -53,28 +53,58 @@ class PrefabMigrator : AssetMigratorBase
       var prefabDeserializer = new YamlStream();
       prefabDeserializer.Load(prefabContents);
 
-
       var assetsRelativePath = Path.GetRelativePath(assetsPath, prefabFile);
       var newProjectRelativePath = Path.Join(destinationPath, assetsRelativePath);
 
-      // Import
-      Request importRequest = new Request();
-      importRequest.InputPath = prefabFile;
-      // importRequest.OutputPath = ;
-      importRequest.SkipSettingsDialog = true;
-
-      var targetDirectory = Path.GetDirectoryName(newProjectRelativePath);
-      Directory.CreateDirectory(targetDirectory);
-      Editor.Instance.ContentDatabase.RefreshFolder(destinationFolder, true);
-
-
       var prefabProxy = Editor.Instance.ContentDatabase.GetProxy<Prefab>();
-      prefabProxy.Create(newProjectRelativePath, null);
+      // TaskCompletionSource<AssetItem> tcs = new TaskCompletionSource<AssetItem>();
+      // Action<ContentItem> onContentAdded = (ContentItem contentItem) =>
+      // {
+      //   Debug.Log(Path.GetFileName(contentItem.Path));
+      //   if (Path.GetFileName(prefabFile) == Path.GetFileName(contentItem.Path))
+      //   {
+      //     tcs.SetResult(contentItem as AssetItem);
+      //   }
+      // };
+      // Editor.Instance.ContentDatabase.ItemAdded += onContentAdded;
+      // prefabProxy.Create(newProjectRelativePath, null);
+      // var assetItem = await tcs.Task;
+      // Editor.Instance.ContentDatabase.ItemAdded -= onContentAdded;
+      // var assetItem = Editor.Instance.ContentDatabase.Find(newProjectRelativePath);
 
-      var contentFolder = (ContentFolder)Editor.Instance.ContentDatabase.Find(targetDirectory);
-      // Editor.Instance.ContentImporting.Import(prefabFile, contentFolder, false, importSettings);
-      // var importEntry = TextureImportEntry.CreateEntry(ref importRequest);
-      // bool success = importEntry.Import();
+      var prefab = FlaxEngine.Content.Load(newProjectRelativePath) as Prefab;
+
+      // Iterate docs 
+      foreach (var doc in prefabDeserializer.Documents)
+      {
+        var anchor = doc.RootNode.Anchor.Value;
+        var mappingRootNode = (doc.RootNode as YamlMappingNode);
+        var rootNodeChildren = mappingRootNode.Children;
+        Debug.Log("Processing doc!");
+        for (var i = 0; i < rootNodeChildren.Count; ++i)
+        {
+          var keyStr = (rootNodeChildren[i].Key as YamlScalarNode).Value;
+          Debug.Log("KeyStr keyStr");
+
+          switch (keyStr)
+          {
+            case "GameObject":
+              Debug.Log("Found GO!");
+              break;
+            case "Transform":
+              Debug.Log("Found transform!");
+              break;
+          }
+        }
+        // foreach (var node in doc.RootNode.AllNodes)
+        // {
+        //   var mapNode = node as YamlMappingNode;
+        //   // foreach (var mapNodeKV in mapNode.Children)
+        //   // {
+        //   //   var key = (mapNodeKV.Key as YamlScalarNode).Value;
+        //   // }
+        // }
+      }
     }
     if (metaErrors)
     {
